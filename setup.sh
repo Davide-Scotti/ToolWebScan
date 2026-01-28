@@ -19,9 +19,9 @@ echo -e "${CYAN}"
 cat << "EOF"
 ╔═══════════════════════════════════════════════════════════╗
 ║                                                           ║
-║   🔐 SECURITY SCANNER PLATFORM - AUTO SETUP 🔐          ║
+║   🔐 SECURITY SCANNER PLATFORM - AUTO SETUP 🔐            ║
 ║                                                           ║
-║   Setting up complete security testing environment       ║
+║   Setting up complete security testing environment        ║
 ║                                                           ║
 ╚═══════════════════════════════════════════════════════════╝
 EOF
