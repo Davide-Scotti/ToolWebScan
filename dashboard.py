@@ -258,7 +258,6 @@ def health():
 
 
 # Template HTML per dashboard
-@app.before_first_request
 def create_templates():
     """Crea template HTML se non esiste"""
     templates_dir = Path("templates")
@@ -518,6 +517,8 @@ def create_templates():
     
     (templates_dir / "dashboard.html").write_text(dashboard_html)
 
+# Crea template all'avvio 
+create_templates()
 
 if __name__ == '__main__':
     print("\n" + "="*60)

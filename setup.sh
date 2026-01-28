@@ -95,27 +95,10 @@ else
     echo -e "${GREEN}✓ Docker Compose installed${NC}"
 fi
 
-# Create project directory
-PROJECT_DIR="$HOME/security-scanner"
-echo -e "\n${CYAN}📁 Creating project directory...${NC}"
-
-if [ -d "$PROJECT_DIR" ]; then
-    echo -e "${YELLOW}⚠️  Directory $PROJECT_DIR already exists${NC}"
-    read -p "Do you want to overwrite it? (y/N): " -n 1 -r
-    echo
-    if [[ $REPLY =~ ^[Yy]$ ]]; then
-        rm -rf "$PROJECT_DIR"
-        mkdir -p "$PROJECT_DIR"
-    else
-        echo -e "${RED}✗ Setup cancelled${NC}"
-        exit 1
-    fi
-else
-    mkdir -p "$PROJECT_DIR"
-fi
-
-cd "$PROJECT_DIR"
-echo -e "${GREEN}✓ Created directory: $PROJECT_DIR${NC}"
+# Usa la directory corrente come progetto
+PROJECT_DIR="$(pwd)"
+echo -e "\n${CYAN}📁 Using current directory as project...${NC}"
+echo -e "${GREEN}✓ Project directory: $PROJECT_DIR${NC}"
 
 # Create necessary subdirectories
 mkdir -p scan_results templates static
