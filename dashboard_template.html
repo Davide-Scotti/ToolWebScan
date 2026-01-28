@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Security Scanner Dashboard</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        .header {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            margin-bottom: 30px;
+        }
+        .header h1 {
+            color: #667eea;
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        .stat-card {
+            background: white;
+            padding: 25px;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+        .stat-card h3 {
+            color: #666;
+            font-size: 0.9em;
+            text-transform: uppercase;
+            margin-bottom: 10px;
+        }
+        .stat-card .value {
+            font-size: 2.5em;
+            font-weight: bold;
+            color: #667eea;
+        }
+        .scan-form {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+        }
+        .scan-form h2 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #666;
+            font-weight: 500;
+        }
+        .form-group input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            font-size: 1em;
+        }
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 12px 30px;
+            border: none;
+            border-radius: 5px;
+            font-size: 1em;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        .btn:hover {
+            transform: translateY(-2px);
+        }
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        /* Active Scan Status */
+        .active-scan {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+            display: none;
+        }
+        .active-scan.show {
+            display: block;
+        }
+        .active-scan h2 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+        .scan-progress {
+            margin-bottom: 20px;
+        }
+        .progress-bar {
+            width: 100%;
+            height: 30px;
+            background: #e0e0e0;
+            border-radius: 15px;
+            overflow: hidden;
+            position: relative;
+        }
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea, #764ba2);
+            transition: width 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+        }
+        .scanning-animation {
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, 
+                transparent, 
+                rgba(255,255,255,0.3), 
+                transparent
+            );
+            animation: scan 2s linear infinite;
+            position: absolute;
+            top: 0;
+            left: -100%;
+        }
+        @keyframes scan {
+            from { left: -100%; }
+            to { left: 100%; }
+        }
+        .scan-details {
+            background: #f5f5f5;
+            padding: 15px;
+            border-radius: 5px;
+            margin-top: 15px;
+        }
+        .scan-details .detail-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #ddd;
+        }
+        .scan-details .detail-row:last-child {
+            border-bottom: none;
+        }
+        .status-badge {
+            display: inline-block;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 0.85em;
+            font-weight: bold;
+        }
+        .status-running {
+            background: #4caf50;
+            color: white;
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
+        .status-completed {
+            background: #2196f3;
+            color: white;
+        }
+        .status-failed {
+            background: #f44336;
+            color: white;
+        }
+        
+        /* Tool Status List */
+        .tools-status {
+            margin-top: 20px;
+        }
+        .tool-item {
+            display: flex;
+            align-items: center;
+            padding: 10px;
+            margin-bottom: 10px;
+            background: white;
+            border-radius: 5px;
+            border-left: 4px solid #ddd;
+        }
+        .tool-item.running {
+            border-left-color: #4caf50;
+            background: #f1f8f4;
+        }
+        .tool-item.completed {
+            border-left-color: #2196f3;
+            background: #f1f6fb;
+        }
+        .tool-item.failed {
+            border-left-color: #f44336;
+            background: #fef1f0;
+        }
+        .tool-icon {
+            font-size: 1.5em;
+            margin-right: 15px;
+            min-width: 30px;
+            text-align: center;
+        }
+        .tool-name {
+            flex: 1;
+            font-weight: 500;
+        }
+        .tool-status {
+            font-size: 0.85em;
+            color: #666;
+        }
+        
+        .spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(102, 126, 234, 0.3);
+            border-radius: 50%;
+            border-top-color: #667eea;
+            animation: spin 1s ease-in-out infinite;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .scans-list {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+        .scan-item {
+            padding: 20px;
+            border-bottom: 1px solid #eee;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .scan-item:hover {
+            background: #f5f5f5;
+        }
+        .severity-badge {
+            display: inline-block;
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 0.8em;
+            font-weight: bold;
+        }
+        .critical { background: #ff4444; color: white; }
+        .high { background: #ff9800; color: white; }
+        .medium { background: #ffeb3b; color: #333; }
+        .low { background: #4caf50; color: white; }
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+        .alert {
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 5px;
+        }
+        .alert-success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .alert-error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔐 Security Scanner Dashboard</h1>
+            <p>Advanced Web Application Security Testing Platform</p>
+        </div>
+
+        <div class="stats-grid" id="stats">
+            <div class="stat-card">
+                <h3>Total Scans</h3>
+                <div class="value" id="totalScans">0</div>
+            </div>
+            <div class="stat-card">
+                <h3>Total Vulnerabilities</h3>
+                <div class="value" id="totalVulns">0</div>
+            </div>
+            <div class="stat-card">
+                <h3>Critical Issues</h3>
+                <div class="value" id="criticalIssues" style="color: #ff4444;">0</div>
+            </div>
+            <div class="stat-card">
+                <h3>High Issues</h3>
+                <div class="value" id="highIssues" style="color: #ff9800;">0</div>
+            </div>
+        </div>
+
+        <div class="scan-form">
+            <h2>Start New Scan</h2>
+            <div id="alertContainer"></div>
+            <form id="scanForm">
+                <div class="form-group">
+                    <label for="targetUrl">Target URL</label>
+                    <input type="url" id="targetUrl" placeholder="https://example.com" required>
+                </div>
+                <button type="submit" class="btn" id="scanButton">🚀 Start Scan</button>
+            </form>
+        </div>
+
+        <!-- Active Scan Progress -->
+        <div class="active-scan" id="activeScanPanel">
+            <h2>🔍 Active Scan</h2>
+            
+            <div class="scan-progress">
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressFill">
+                        <span id="progressText">Initializing...</span>
+                    </div>
+                    <div class="scanning-animation"></div>
+                </div>
+            </div>
+
+            <div class="scan-details">
+                <div class="detail-row">
+                    <strong>Target:</strong>
+                    <span id="scanTarget">-</span>
+                </div>
+                <div class="detail-row">
+                    <strong>Scan ID:</strong>
+                    <span id="scanId">-</span>
+                </div>
+                <div class="detail-row">
+                    <strong>Status:</strong>
+                    <span class="status-badge status-running" id="scanStatus">Running</span>
+                </div>
+                <div class="detail-row">
+                    <strong>Elapsed Time:</strong>
+                    <span id="elapsedTime">0s</span>
+                </div>
+            </div>
+
+            <div class="tools-status">
+                <h3 style="margin-bottom: 15px;">Tool Progress</h3>
+                <div id="toolsList">
+                    <div class="tool-item running">
+                        <div class="tool-icon">🔍</div>
+                        <div class="tool-name">Nmap</div>
+                        <div class="tool-status"><div class="spinner"></div> Scanning ports...</div>
+                    </div>
+                    <div class="tool-item">
+                        <div class="tool-icon">🔎</div>
+                        <div class="tool-name">Nikto</div>
+                        <div class="tool-status">Waiting...</div>
+                    </div>
+                    <div class="tool-item">
+                        <div class="tool-icon">🌐</div>
+                        <div class="tool-name">WhatWeb</div>
+                        <div class="tool-status">Waiting...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="scans-list">
+            <h2>Recent Scans</h2>
+            <div id="scansList" class="loading">Loading scans...</div>
+        </div>
+    </div>
+
+    <script>
+        let currentScanId = null;
+        let scanStartTime = null;
+        let scanPollInterval = null;
+
+        function showAlert(message, type = 'success') {
+            const alertContainer = document.getElementById('alertContainer');
+            const alertClass = type === 'success' ? 'alert-success' : 'alert-error';
+            alertContainer.innerHTML = `<div class="alert ${alertClass}">${message}</div>`;
+            setTimeout(() => {
+                alertContainer.innerHTML = '';
+            }, 5000);
+        }
+
+        function formatElapsedTime(seconds) {
+            const mins = Math.floor(seconds / 60);
+            const secs = seconds % 60;
+            return mins > 0 ? `${mins}m ${secs}s` : `${secs}s`;
+        }
+
+        function updateElapsedTime() {
+            if (!scanStartTime) return;
+            const elapsed = Math.floor((Date.now() - scanStartTime) / 1000);
+            document.getElementById('elapsedTime').textContent = formatElapsedTime(elapsed);
+        }
+
+        function showActiveScanPanel(scanId, targetUrl) {
+            currentScanId = scanId;
+            scanStartTime = Date.now();
+            
+            document.getElementById('activeScanPanel').classList.add('show');
+            document.getElementById('scanTarget').textContent = targetUrl;
+            document.getElementById('scanId').textContent = scanId;
+            document.getElementById('progressFill').style.width = '30%';
+            document.getElementById('progressText').textContent = 'Scanning... 30%';
+            
+            // Update elapsed time every second
+            setInterval(updateElapsedTime, 1000);
+            
+            // Poll scan status
+            startScanPolling(scanId);
+        }
+
+        function hideActiveScanPanel() {
+            document.getElementById('activeScanPanel').classList.remove('show');
+            currentScanId = null;
+            scanStartTime = null;
+            if (scanPollInterval) {
+                clearInterval(scanPollInterval);
+                scanPollInterval = null;
+            }
+        }
+
+        async function startScanPolling(scanId) {
+            scanPollInterval = setInterval(async () => {
+                try {
+                    const response = await fetch(`/api/scan_status/${scanId}`);
+                    const status = await response.json();
+                    
+                    if (status.status === 'completed') {
+                        document.getElementById('progressFill').style.width = '100%';
+                        document.getElementById('progressText').textContent = '✓ Completed!';
+                        document.getElementById('scanStatus').textContent = 'Completed';
+                        document.getElementById('scanStatus').className = 'status-badge status-completed';
+                        
+                        // Mark all tools as completed
+                        document.querySelectorAll('.tool-item').forEach(item => {
+                            item.classList.remove('running');
+                            item.classList.add('completed');
+                            item.querySelector('.tool-status').innerHTML = '✓ Completed';
+                        });
+                        
+                        clearInterval(scanPollInterval);
+                        showAlert('✅ Scan completed successfully!', 'success');
+                        
+                        // Reload scans list
+                        setTimeout(() => {
+                            hideActiveScanPanel();
+                            loadScans();
+                            loadStats();
+                        }, 3000);
+                    } else if (status.status === 'failed') {
+                        document.getElementById('scanStatus').textContent = 'Failed';
+                        document.getElementById('scanStatus').className = 'status-badge status-failed';
+                        clearInterval(scanPollInterval);
+                        showAlert('❌ Scan failed: ' + (status.error || 'Unknown error'), 'error');
+                    } else {
+                        // Still running - update progress
+                        const progress = Math.min(90, 30 + Math.floor((Date.now() - scanStartTime) / 1000));
+                        document.getElementById('progressFill').style.width = progress + '%';
+                        document.getElementById('progressText').textContent = `Scanning... ${progress}%`;
+                    }
+                } catch (error) {
+                    console.error('Error polling scan status:', error);
+                }
+            }, 3000); // Poll every 3 seconds
+        }
+
+        // Load statistics
+        async function loadStats() {
+            try {
+                const response = await fetch('/api/statistics');
+                const data = await response.json();
+                
+                document.getElementById('totalScans').textContent = data.total_scans;
+                document.getElementById('totalVulns').textContent = data.total_vulnerabilities;
+                document.getElementById('criticalIssues').textContent = data.vulnerabilities_by_severity.critical;
+                document.getElementById('highIssues').textContent = data.vulnerabilities_by_severity.high;
+            } catch (error) {
+                console.error('Error loading stats:', error);
+            }
+        }
+
+        // Load scans list
+        async function loadScans() {
+            try {
+                const response = await fetch('/api/scans');
+                const scans = await response.json();
+                
+                const container = document.getElementById('scansList');
+                
+                if (scans.length === 0) {
+                    container.innerHTML = '<p class="loading">No scans yet. Start your first scan!</p>';
+                    return;
+                }
+                
+                container.innerHTML = scans.map(scan => `
+                    <div class="scan-item" onclick="viewScan('${scan.scan_id}')">
+                        <strong>${scan.target}</strong>
+                        <br>
+                        <small>${new Date(scan.start_time).toLocaleString()}</small>
+                        <br>
+                        <span class="severity-badge medium">${scan.total_vulnerabilities} vulnerabilities</span>
+                    </div>
+                `).join('');
+            } catch (error) {
+                console.error('Error loading scans:', error);
+                document.getElementById('scansList').innerHTML = '<p class="loading">Error loading scans</p>';
+            }
+        }
+
+        // Start new scan
+        document.getElementById('scanForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const targetUrl = document.getElementById('targetUrl').value;
+            const scanButton = document.getElementById('scanButton');
+            
+            if (!confirm(`Start security scan on ${targetUrl}?\n\nMake sure you have authorization!`)) {
+                return;
+            }
+            
+            // Disable button during scan
+            scanButton.disabled = true;
+            scanButton.textContent = '⏳ Starting scan...';
+            
+            try {
+                const response = await fetch('/api/start_scan', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ target_url: targetUrl })
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    showAlert(`✅ Scan started! ID: ${result.scan_id}`, 'success');
+                    document.getElementById('targetUrl').value = '';
+                    
+                    // Show active scan panel
+                    showActiveScanPanel(result.scan_id, targetUrl);
+                } else {
+                    showAlert(`❌ Error: ${result.error}`, 'error');
+                }
+            } catch (error) {
+                showAlert(`❌ Network error: ${error.message}`, 'error');
+            } finally {
+                scanButton.disabled = false;
+                scanButton.textContent = '🚀 Start Scan';
+            }
+        });
+
+        // View scan details
+        function viewScan(scanId) {
+            alert(`View details for scan: ${scanId}\n\nDetailed view coming soon!`);
+        }
+
+        // Load data on page load
+        loadStats();
+        loadScans();
+        
+        // Auto-refresh stats every 30 seconds
+        setInterval(() => {
+            if (!currentScanId) {
+                loadStats();
+                loadScans();
+            }
+        }, 30000);
+    </script>
+</body>
+</html>
