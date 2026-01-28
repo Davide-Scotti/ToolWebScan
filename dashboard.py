@@ -98,13 +98,15 @@ def start_scan():
                 "start_time": datetime.now().isoformat()
             }
             
-            # Esegui orchestrator
+            # 🔧 FIX: Usa orchestrator.py invece di scanner.py
             cmd = [
                 sys.executable,
-                "scanner.py",
+                "orchestrator.py",  # ✅ Cambiato da scanner.py
                 target_url,
                 "-o", str(SCAN_RESULTS_DIR)
             ]
+            
+            print(f"🚀 Starting scan with command: {' '.join(cmd)}")
             
             process = subprocess.run(
                 cmd,
@@ -113,12 +115,23 @@ def start_scan():
                 timeout=3600  # 1 hour timeout
             )
             
+            # Log output per debugging
+            if process.stdout:
+                print(f"📊 Scan output:\n{process.stdout}")
+            if process.stderr:
+                print(f"⚠️ Scan errors:\n{process.stderr}")
+            
             active_scans[scan_id]["status"] = "completed"
             active_scans[scan_id]["end_time"] = datetime.now().isoformat()
+            active_scans[scan_id]["return_code"] = process.returncode
             
+        except subprocess.TimeoutExpired:
+            active_scans[scan_id]["status"] = "timeout"
+            active_scans[scan_id]["error"] = "Scan exceeded 1 hour timeout"
         except Exception as e:
             active_scans[scan_id]["status"] = "failed"
             active_scans[scan_id]["error"] = str(e)
+            print(f"❌ Scan failed: {e}")
     
     thread = threading.Thread(target=run_scan_background)
     thread.daemon = True
@@ -127,7 +140,8 @@ def start_scan():
     return jsonify({
         "scan_id": scan_id,
         "status": "started",
-        "message": "Scan started successfully"
+        "message": "Scan started successfully",
+        "check_status_url": f"/api/scan_status/{scan_id}"
     })
 
 
@@ -254,7 +268,12 @@ def export_scan(scan_id):
 @app.route('/health')
 def health():
     """Health check endpoint"""
-    return jsonify({"status": "healthy"})
+    return jsonify({
+        "status": "healthy",
+        "version": "1.0.0",
+        "scan_results_dir": str(SCAN_RESULTS_DIR),
+        "active_scans": len(active_scans)
+    })
 
 
 # Template HTML per dashboard
@@ -356,6 +375,10 @@ def create_templates():
         .btn:hover {
             transform: translateY(-2px);
         }
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
         .scans-list {
             background: white;
             padding: 30px;
@@ -387,6 +410,21 @@ def create_templates():
             padding: 40px;
             color: #666;
         }
+        .alert {
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 5px;
+        }
+        .alert-success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .alert-error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
     </style>
 </head>
 <body>
@@ -417,12 +455,13 @@ def create_templates():
 
         <div class="scan-form">
             <h2>Start New Scan</h2>
+            <div id="alertContainer"></div>
             <form id="scanForm">
                 <div class="form-group">
                     <label for="targetUrl">Target URL</label>
                     <input type="url" id="targetUrl" placeholder="https://example.com" required>
                 </div>
-                <button type="submit" class="btn">🚀 Start Scan</button>
+                <button type="submit" class="btn" id="scanButton">🚀 Start Scan</button>
             </form>
         </div>
 
@@ -433,38 +472,56 @@ def create_templates():
     </div>
 
     <script>
+        function showAlert(message, type = 'success') {
+            const alertContainer = document.getElementById('alertContainer');
+            const alertClass = type === 'success' ? 'alert-success' : 'alert-error';
+            alertContainer.innerHTML = `<div class="alert ${alertClass}">${message}</div>`;
+            setTimeout(() => {
+                alertContainer.innerHTML = '';
+            }, 5000);
+        }
+
         // Load statistics
         async function loadStats() {
-            const response = await fetch('/api/statistics');
-            const data = await response.json();
-            
-            document.getElementById('totalScans').textContent = data.total_scans;
-            document.getElementById('totalVulns').textContent = data.total_vulnerabilities;
-            document.getElementById('criticalIssues').textContent = data.vulnerabilities_by_severity.critical;
-            document.getElementById('highIssues').textContent = data.vulnerabilities_by_severity.high;
+            try {
+                const response = await fetch('/api/statistics');
+                const data = await response.json();
+                
+                document.getElementById('totalScans').textContent = data.total_scans;
+                document.getElementById('totalVulns').textContent = data.total_vulnerabilities;
+                document.getElementById('criticalIssues').textContent = data.vulnerabilities_by_severity.critical;
+                document.getElementById('highIssues').textContent = data.vulnerabilities_by_severity.high;
+            } catch (error) {
+                console.error('Error loading stats:', error);
+            }
         }
 
         // Load scans list
         async function loadScans() {
-            const response = await fetch('/api/scans');
-            const scans = await response.json();
-            
-            const container = document.getElementById('scansList');
-            
-            if (scans.length === 0) {
-                container.innerHTML = '<p class="loading">No scans yet. Start your first scan!</p>';
-                return;
+            try {
+                const response = await fetch('/api/scans');
+                const scans = await response.json();
+                
+                const container = document.getElementById('scansList');
+                
+                if (scans.length === 0) {
+                    container.innerHTML = '<p class="loading">No scans yet. Start your first scan!</p>';
+                    return;
+                }
+                
+                container.innerHTML = scans.map(scan => `
+                    <div class="scan-item" onclick="viewScan('${scan.scan_id}')">
+                        <strong>${scan.target}</strong>
+                        <br>
+                        <small>${new Date(scan.start_time).toLocaleString()}</small>
+                        <br>
+                        <span class="severity-badge medium">${scan.total_vulnerabilities} vulnerabilities</span>
+                    </div>
+                `).join('');
+            } catch (error) {
+                console.error('Error loading scans:', error);
+                document.getElementById('scansList').innerHTML = '<p class="loading">Error loading scans</p>';
             }
-            
-            container.innerHTML = scans.map(scan => `
-                <div class="scan-item" onclick="viewScan('${scan.scan_id}')">
-                    <strong>${scan.target}</strong>
-                    <br>
-                    <small>${new Date(scan.start_time).toLocaleString()}</small>
-                    <br>
-                    <span class="severity-badge medium">${scan.total_vulnerabilities} vulnerabilities</span>
-                </div>
-            `).join('');
         }
 
         // Start new scan
@@ -472,34 +529,49 @@ def create_templates():
             e.preventDefault();
             
             const targetUrl = document.getElementById('targetUrl').value;
+            const scanButton = document.getElementById('scanButton');
             
             if (!confirm(`Start security scan on ${targetUrl}?\\n\\nMake sure you have authorization!`)) {
                 return;
             }
             
-            const response = await fetch('/api/start_scan', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ target_url: targetUrl })
-            });
+            // Disable button during scan
+            scanButton.disabled = true;
+            scanButton.textContent = '⏳ Starting scan...';
             
-            const result = await response.json();
-            
-            if (response.ok) {
-                alert(`Scan started! ID: ${result.scan_id}`);
-                document.getElementById('targetUrl').value = '';
-                setTimeout(() => {
-                    loadScans();
-                    loadStats();
-                }, 2000);
-            } else {
-                alert(`Error: ${result.error}`);
+            try {
+                const response = await fetch('/api/start_scan', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ target_url: targetUrl })
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    showAlert(`✅ Scan started successfully! ID: ${result.scan_id}`, 'success');
+                    document.getElementById('targetUrl').value = '';
+                    
+                    // Refresh data after 3 seconds
+                    setTimeout(() => {
+                        loadScans();
+                        loadStats();
+                    }, 3000);
+                } else {
+                    showAlert(`❌ Error: ${result.error}`, 'error');
+                }
+            } catch (error) {
+                showAlert(`❌ Network error: ${error.message}`, 'error');
+            } finally {
+                scanButton.disabled = false;
+                scanButton.textContent = '🚀 Start Scan';
             }
         });
 
         // View scan details
         function viewScan(scanId) {
-            window.location.href = `/scan/${scanId}`;
+            // Per ora mostra solo alert, in futuro puoi creare una pagina dettagliata
+            alert(`View details for scan: ${scanId}\\n\\nDetailed view coming soon!`);
         }
 
         // Load data on page load
