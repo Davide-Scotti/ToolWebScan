@@ -380,6 +380,154 @@ def create_templates():
             opacity: 0.5;
             cursor: not-allowed;
         }
+        
+        /* Active Scan Status */
+        .active-scan {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+            display: none;
+        }
+        .active-scan.show {
+            display: block;
+        }
+        .active-scan h2 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+        .scan-progress {
+            margin-bottom: 20px;
+        }
+        .progress-bar {
+            width: 100%;
+            height: 30px;
+            background: #e0e0e0;
+            border-radius: 15px;
+            overflow: hidden;
+            position: relative;
+        }
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea, #764ba2);
+            transition: width 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+        }
+        .scanning-animation {
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, 
+                transparent, 
+                rgba(255,255,255,0.3), 
+                transparent
+            );
+            animation: scan 2s linear infinite;
+            position: absolute;
+            top: 0;
+            left: -100%;
+        }
+        @keyframes scan {
+            from { left: -100%; }
+            to { left: 100%; }
+        }
+        .scan-details {
+            background: #f5f5f5;
+            padding: 15px;
+            border-radius: 5px;
+            margin-top: 15px;
+        }
+        .scan-details .detail-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #ddd;
+        }
+        .scan-details .detail-row:last-child {
+            border-bottom: none;
+        }
+        .status-badge {
+            display: inline-block;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 0.85em;
+            font-weight: bold;
+        }
+        .status-running {
+            background: #4caf50;
+            color: white;
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
+        .status-completed {
+            background: #2196f3;
+            color: white;
+        }
+        .status-failed {
+            background: #f44336;
+            color: white;
+        }
+        
+        /* Tool Status List */
+        .tools-status {
+            margin-top: 20px;
+        }
+        .tool-item {
+            display: flex;
+            align-items: center;
+            padding: 10px;
+            margin-bottom: 10px;
+            background: white;
+            border-radius: 5px;
+            border-left: 4px solid #ddd;
+        }
+        .tool-item.running {
+            border-left-color: #4caf50;
+            background: #f1f8f4;
+        }
+        .tool-item.completed {
+            border-left-color: #2196f3;
+            background: #f1f6fb;
+        }
+        .tool-item.failed {
+            border-left-color: #f44336;
+            background: #fef1f0;
+        }
+        .tool-icon {
+            font-size: 1.5em;
+            margin-right: 15px;
+            min-width: 30px;
+            text-align: center;
+        }
+        .tool-name {
+            flex: 1;
+            font-weight: 500;
+        }
+        .tool-status {
+            font-size: 0.85em;
+            color: #666;
+        }
+        
+        .spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(102, 126, 234, 0.3);
+            border-radius: 50%;
+            border-top-color: #667eea;
+            animation: spin 1s ease-in-out infinite;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
         .scans-list {
             background: white;
             padding: 30px;
@@ -466,6 +614,60 @@ def create_templates():
             </form>
         </div>
 
+        <!-- Active Scan Progress -->
+        <div class="active-scan" id="activeScanPanel">
+            <h2>🔍 Active Scan</h2>
+            
+            <div class="scan-progress">
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressFill">
+                        <span id="progressText">Initializing...</span>
+                    </div>
+                    <div class="scanning-animation"></div>
+                </div>
+            </div>
+
+            <div class="scan-details">
+                <div class="detail-row">
+                    <strong>Target:</strong>
+                    <span id="scanTarget">-</span>
+                </div>
+                <div class="detail-row">
+                    <strong>Scan ID:</strong>
+                    <span id="scanId">-</span>
+                </div>
+                <div class="detail-row">
+                    <strong>Status:</strong>
+                    <span class="status-badge status-running" id="scanStatus">Running</span>
+                </div>
+                <div class="detail-row">
+                    <strong>Elapsed Time:</strong>
+                    <span id="elapsedTime">0s</span>
+                </div>
+            </div>
+
+            <div class="tools-status">
+                <h3 style="margin-bottom: 15px;">Tool Progress</h3>
+                <div id="toolsList">
+                    <div class="tool-item running">
+                        <div class="tool-icon">🔍</div>
+                        <div class="tool-name">Nmap</div>
+                        <div class="tool-status"><div class="spinner"></div> Scanning ports...</div>
+                    </div>
+                    <div class="tool-item">
+                        <div class="tool-icon">🔎</div>
+                        <div class="tool-name">Nikto</div>
+                        <div class="tool-status">Waiting...</div>
+                    </div>
+                    <div class="tool-item">
+                        <div class="tool-icon">🌐</div>
+                        <div class="tool-name">WhatWeb</div>
+                        <div class="tool-status">Waiting...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <div class="scans-list">
             <h2>Recent Scans</h2>
             <div id="scansList" class="loading">Loading scans...</div>
@@ -473,6 +675,10 @@ def create_templates():
     </div>
 
     <script>
+        let currentScanId = null;
+        let scanStartTime = null;
+        let scanPollInterval = null;
+
         function showAlert(message, type = 'success') {
             const alertContainer = document.getElementById('alertContainer');
             const alertClass = type === 'success' ? 'alert-success' : 'alert-error';
@@ -480,6 +686,90 @@ def create_templates():
             setTimeout(() => {
                 alertContainer.innerHTML = '';
             }, 5000);
+        }
+
+        function formatElapsedTime(seconds) {
+            const mins = Math.floor(seconds / 60);
+            const secs = seconds % 60;
+            return mins > 0 ? `${mins}m ${secs}s` : `${secs}s`;
+        }
+
+        function updateElapsedTime() {
+            if (!scanStartTime) return;
+            const elapsed = Math.floor((Date.now() - scanStartTime) / 1000);
+            document.getElementById('elapsedTime').textContent = formatElapsedTime(elapsed);
+        }
+
+        function showActiveScanPanel(scanId, targetUrl) {
+            currentScanId = scanId;
+            scanStartTime = Date.now();
+            
+            document.getElementById('activeScanPanel').classList.add('show');
+            document.getElementById('scanTarget').textContent = targetUrl;
+            document.getElementById('scanId').textContent = scanId;
+            document.getElementById('progressFill').style.width = '30%';
+            document.getElementById('progressText').textContent = 'Scanning... 30%';
+            
+            // Update elapsed time every second
+            setInterval(updateElapsedTime, 1000);
+            
+            // Poll scan status
+            startScanPolling(scanId);
+        }
+
+        function hideActiveScanPanel() {
+            document.getElementById('activeScanPanel').classList.remove('show');
+            currentScanId = null;
+            scanStartTime = null;
+            if (scanPollInterval) {
+                clearInterval(scanPollInterval);
+                scanPollInterval = null;
+            }
+        }
+
+        async function startScanPolling(scanId) {
+            scanPollInterval = setInterval(async () => {
+                try {
+                    const response = await fetch(`/api/scan_status/${scanId}`);
+                    const status = await response.json();
+                    
+                    if (status.status === 'completed') {
+                        document.getElementById('progressFill').style.width = '100%';
+                        document.getElementById('progressText').textContent = '✓ Completed!';
+                        document.getElementById('scanStatus').textContent = 'Completed';
+                        document.getElementById('scanStatus').className = 'status-badge status-completed';
+                        
+                        // Mark all tools as completed
+                        document.querySelectorAll('.tool-item').forEach(item => {
+                            item.classList.remove('running');
+                            item.classList.add('completed');
+                            item.querySelector('.tool-status').innerHTML = '✓ Completed';
+                        });
+                        
+                        clearInterval(scanPollInterval);
+                        showAlert('✅ Scan completed successfully!', 'success');
+                        
+                        // Reload scans list
+                        setTimeout(() => {
+                            hideActiveScanPanel();
+                            loadScans();
+                            loadStats();
+                        }, 3000);
+                    } else if (status.status === 'failed') {
+                        document.getElementById('scanStatus').textContent = 'Failed';
+                        document.getElementById('scanStatus').className = 'status-badge status-failed';
+                        clearInterval(scanPollInterval);
+                        showAlert('❌ Scan failed: ' + (status.error || 'Unknown error'), 'error');
+                    } else {
+                        // Still running - update progress
+                        const progress = Math.min(90, 30 + Math.floor((Date.now() - scanStartTime) / 1000));
+                        document.getElementById('progressFill').style.width = progress + '%';
+                        document.getElementById('progressText').textContent = `Scanning... ${progress}%`;
+                    }
+                } catch (error) {
+                    console.error('Error polling scan status:', error);
+                }
+            }, 3000); // Poll every 3 seconds
         }
 
         // Load statistics
@@ -532,7 +822,7 @@ def create_templates():
             const targetUrl = document.getElementById('targetUrl').value;
             const scanButton = document.getElementById('scanButton');
             
-            if (!confirm(`Start security scan on ${targetUrl}?\\n\\nMake sure you have authorization!`)) {
+            if (!confirm(`Start security scan on ${targetUrl}?\n\nMake sure you have authorization!`)) {
                 return;
             }
             
@@ -550,14 +840,11 @@ def create_templates():
                 const result = await response.json();
                 
                 if (response.ok) {
-                    showAlert(`✅ Scan started successfully! ID: ${result.scan_id}`, 'success');
+                    showAlert(`✅ Scan started! ID: ${result.scan_id}`, 'success');
                     document.getElementById('targetUrl').value = '';
                     
-                    // Refresh data after 3 seconds
-                    setTimeout(() => {
-                        loadScans();
-                        loadStats();
-                    }, 3000);
+                    // Show active scan panel
+                    showActiveScanPanel(result.scan_id, targetUrl);
                 } else {
                     showAlert(`❌ Error: ${result.error}`, 'error');
                 }
@@ -571,18 +858,19 @@ def create_templates():
 
         // View scan details
         function viewScan(scanId) {
-            // Per ora mostra solo alert, in futuro puoi creare una pagina dettagliata
-            alert(`View details for scan: ${scanId}\\n\\nDetailed view coming soon!`);
+            alert(`View details for scan: ${scanId}\n\nDetailed view coming soon!`);
         }
 
         // Load data on page load
         loadStats();
         loadScans();
         
-        // Auto-refresh every 30 seconds
+        // Auto-refresh stats every 30 seconds
         setInterval(() => {
-            loadStats();
-            loadScans();
+            if (!currentScanId) {
+                loadStats();
+                loadScans();
+            }
         }, 30000);
     </script>
 </body>
