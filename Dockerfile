@@ -1,95 +1,59 @@
-FROM ubuntu:22.04
+FROM python:3.9-slim
 
-LABEL maintainer="Security Scanner"
-LABEL description="Security scanning environment (without ZAP)"
+WORKDIR /app
 
-ENV DEBIAN_FRONTEND=noninteractive
-ENV TZ=Europe/Rome
-
-# Update e installazione dipendenze base
+# Install system dependencies
 RUN apt-get update && apt-get install -y \
     wget \
     curl \
     git \
-    python3 \
-    python3-pip \
-    perl \
-    libnet-ssleay-perl \
-    openssl \
-    libssl-dev \
-    libcrypt-ssleay-perl \
-    libwhisker2-perl \
     nmap \
-    unzip \
-    bsdmainutils \
-    dnsutils \
+    nikto \
+    whatweb \
+    dirb \
+    gobuster \
     net-tools \
+    default-jre \
+    perl \
+    libssl-dev \
+    libffi-dev \
+    build-essential \
+    python3-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Installazione Python dependencies
-RUN pip3 install --no-cache-dir \
-    requests \
-    beautifulsoup4 \
-    colorama \
-    flask \
-    flask-cors \
-    python-dateutil
+# Install Nuclei
+RUN wget -q https://github.com/projectdiscovery/nuclei/releases/download/v3.1.0/nuclei_3.1.0_linux_amd64.zip \
+    && unzip nuclei_3.1.0_linux_amd64.zip \
+    && mv nuclei /usr/local/bin/ \
+    && rm nuclei_3.1.0_linux_amd64.zip
 
-# ========================================
-# Nuclei Installation
-# ========================================
-RUN wget -q https://github.com/projectdiscovery/nuclei/releases/download/v3.1.0/nuclei_3.1.0_linux_amd64.zip -O /tmp/nuclei.zip && \
-    unzip /tmp/nuclei.zip -d /usr/local/bin && \
-    chmod +x /usr/local/bin/nuclei && \
-    rm /tmp/nuclei.zip
+# Install SQLMap
+RUN git clone https://github.com/sqlmapproject/sqlmap.git /opt/sqlmap \
+    && ln -s /opt/sqlmap/sqlmap.py /usr/local/bin/sqlmap
 
-RUN nuclei -update-templates
+# Install testssl.sh
+RUN git clone https://github.com/drwetter/testssl.sh.git /opt/testssl.sh \
+    && ln -s /opt/testssl.sh/testssl.sh /usr/local/bin/testssl.sh
 
-# ========================================
-# Nikto Installation
-# ========================================
-RUN git clone https://github.com/sullo/nikto.git /opt/nikto && \
-    ln -s /opt/nikto/program/nikto.pl /usr/local/bin/nikto && \
-    chmod +x /usr/local/bin/nikto
+# Copy requirements and install Python dependencies
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
 
-# ========================================
-# SQLMap Installation
-# ========================================
-RUN git clone --depth 1 https://github.com/sqlmapproject/sqlmap.git /opt/sqlmap && \
-    ln -s /opt/sqlmap/sqlmap.py /usr/local/bin/sqlmap && \
-    chmod +x /usr/local/bin/sqlmap
+# Copy application code
+COPY orchestrator.py .
+COPY dashboard.py .
+COPY scanner.py .
+COPY requirements.txt .
 
-# ========================================
-# Testssl.sh Installation
-# ========================================
-RUN git clone --depth 1 https://github.com/drwetter/testssl.sh.git /opt/testssl && \
-    ln -s /opt/testssl/testssl.sh /usr/local/bin/testssl.sh && \
-    chmod +x /usr/local/bin/testssl.sh
+# Create necessary directories
+RUN mkdir -p scan_results templates static
 
-# ========================================
-# Wapiti Installation
-# ========================================
-RUN pip3 install --no-cache-dir wapiti3
+# Create dashboard template
+RUN mkdir -p templates && \
+    echo '<!DOCTYPE html><html><head><title>Security Scanner</title></head><body><h1>Security Scanner Dashboard</h1></body></html>' > templates/dashboard.html
 
-# ========================================
-# Directory setup
-# ========================================
-WORKDIR /scanner
-
-COPY orchestrator.py /scanner/
-COPY dashboard.py /scanner/
-COPY requirements.txt /scanner/
-
-RUN pip3 install --no-cache-dir -r requirements.txt
-
-RUN mkdir -p /scanner/scan_results /scanner/static /scanner/templates
-
-ENV PYTHONUNBUFFERED=1
-
+# Expose port
 EXPOSE 5000
 
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:5000/health || exit 1
-
-CMD ["python3", "dashboard.py"]
-EOF
+# Start the application
+CMD ["python", "dashboard.py"]

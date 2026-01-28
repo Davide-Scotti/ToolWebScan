@@ -18,7 +18,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Configuration
-SCAN_RESULTS_DIR = Path("scan_results")
+SCAN_RESULTS_DIR = Path("scan_results") 
 SCAN_RESULTS_DIR.mkdir(exist_ok=True)
 
 # In-memory storage per scan attive
@@ -101,7 +101,7 @@ def start_scan():
             # Esegui orchestrator
             cmd = [
                 sys.executable,
-                "orchestrator.py",
+                "scanner.py",
                 target_url,
                 "-o", str(SCAN_RESULTS_DIR)
             ]

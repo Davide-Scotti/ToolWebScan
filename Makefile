@@ -1,128 +1,82 @@
-.PHONY: help build start stop restart logs dashboard scan test clean status
+.PHONY: help start stop restart logs status dashboard test scan clean
 
 # Colors
-CYAN := \033[0;36m
-GREEN := \033[0;32m
-YELLOW := \033[1;33m
-NC := \033[0m
+RED=\033[0;31m
+GREEN=\033[0;32m
+YELLOW=\033[1;33m
+NC=\033[0m
 
-help: ## Show this help message
+help:
+	@echo "$(GREEN)Security Scanner Platform$(NC)"
 	@echo ""
-	@echo "$(CYAN)╔═══════════════════════════════════════════════════════════╗$(NC)"
-	@echo "$(CYAN)║   🔐 Security Scanner - Available Commands              ║$(NC)"
-	@echo "$(CYAN)╚═══════════════════════════════════════════════════════════╝$(NC)"
-	@echo ""
-	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  $(GREEN)%-15s$(NC) %s\n", $$1, $$2}'
-	@echo ""
+	@echo "Usage:"
+	@echo "  $(YELLOW)make start$(NC)      - Start the scanner"
+	@echo "  $(YELLOW)make stop$(NC)       - Stop the scanner"
+	@echo "  $(YELLOW)make restart$(NC)    - Restart the scanner"
+	@echo "  $(YELLOW)make logs$(NC)       - Show logs"
+	@echo "  $(YELLOW)make status$(NC)     - Check status"
+	@echo "  $(YELLOW)make dashboard$(NC)  - Open dashboard"
+	@echo "  $(YELLOW)make test$(NC)       - Run test scan"
+	@echo "  $(YELLOW)make clean$(NC)      - Clean up"
+	@echo "  $(YELLOW)make scan URL=...$(NC) - Run scan on URL"
 
-build: ## Build Docker container
-	@echo "$(CYAN)🏗️  Building Docker container...$(NC)"
-	docker-compose build
-	@echo "$(GREEN)✓ Build completed$(NC)"
-
-start: ## Start the scanner services
-	@echo "$(CYAN)🚀 Starting services...$(NC)"
+start:
+	@echo "$(GREEN)🚀 Starting services...$(NC)"
 	docker-compose up -d
-	@sleep 3
-	@echo "$(GREEN)✓ Services started$(NC)"
-	@echo "$(YELLOW)📊 Dashboard: http://localhost:5000$(NC)"
 
-stop: ## Stop the scanner services
-	@echo "$(CYAN)🛑 Stopping services...$(NC)"
+stop:
+	@echo "$(YELLOW)🛑 Stopping services...$(NC)"
 	docker-compose down
-	@echo "$(GREEN)✓ Services stopped$(NC)"
 
-restart: ## Restart the scanner services
-	@echo "$(CYAN)🔄 Restarting services...$(NC)"
-	docker-compose restart
-	@sleep 3
-	@echo "$(GREEN)✓ Services restarted$(NC)"
+restart: stop start
 
-logs: ## Show container logs
-	@echo "$(CYAN)📋 Showing logs (Ctrl+C to exit)...$(NC)"
+logs:
+	@echo "$(GREEN)📋 Showing logs (Ctrl+C to exit)...$(NC)"
 	docker-compose logs -f
 
-dashboard: ## Open dashboard in browser
-	@echo "$(CYAN)🌐 Opening dashboard...$(NC)"
-	@command -v xdg-open >/dev/null 2>&1 && xdg-open http://localhost:5000 || \
-	 command -v open >/dev/null 2>&1 && open http://localhost:5000 || \
-	 echo "$(YELLOW)Please open http://localhost:5000 in your browser$(NC)"
-
-scan: ## Run CLI scan (Usage: make scan URL=http://target.com)
-ifndef URL
-	@echo "$(YELLOW)⚠️  Usage: make scan URL=http://target.com$(NC)"
-else
-	@echo "$(CYAN)🎯 Scanning $(URL)...$(NC)"
-	@docker exec -it security_scanner python3 orchestrator.py $(URL)
-endif
-
-test: ## Run test scan on legal target
-	@echo "$(CYAN)🧪 Running test scan...$(NC)"
-	@bash test_scanner.sh
-
-clean: ## Clean scan results
-	@echo "$(YELLOW)⚠️  This will delete all scan results!$(NC)"
-	@read -p "Are you sure? (y/N): " confirm; \
-	if [ "$$confirm" = "y" ]; then \
-		echo "$(CYAN)🧹 Cleaning scan results...$(NC)"; \
-		rm -rf scan_results/*; \
-		echo "$(GREEN)✓ Cleaned$(NC)"; \
-	else \
-		echo "$(YELLOW)Cancelled$(NC)"; \
-	fi
-
-status: ## Check scanner status
-	@echo "$(CYAN)🔍 Checking status...$(NC)"
-	@if docker ps | grep -q security_scanner; then \
-		echo "$(GREEN)✓ Scanner is running$(NC)"; \
-		echo "$(YELLOW)📊 Dashboard: http://localhost:5000$(NC)"; \
-		docker ps --filter name=security_scanner --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"; \
+status:
+	@echo "$(GREEN)🔍 Checking status...$(NC)"
+	@if docker-compose ps | grep -q "Up"; then \
+		echo "$(GREEN)✅ Scanner is running$(NC)"; \
+		echo "Dashboard: http://localhost:5000"; \
 	else \
 		echo "$(YELLOW)⚠️  Scanner is not running$(NC)"; \
-		echo "$(CYAN)Run 'make start' to start it$(NC)"; \
+		echo "Run 'make start' to start it"; \
 	fi
 
-install: ## Install/setup everything
-	@echo "$(CYAN)📦 Running installation...$(NC)"
-	@bash setup.sh
+dashboard:
+	@echo "$(GREEN)🌐 Opening dashboard...$(NC)"
+	@xdg-open http://localhost:5000 2>/dev/null || \
+	open http://localhost:5000 2>/dev/null || \
+	echo "Please open: http://localhost:5000"
 
-update: ## Update scanner tools
-	@echo "$(CYAN)🔄 Updating tools...$(NC)"
-	docker exec security_scanner nuclei -update-templates
-	@echo "$(GREEN)✓ Tools updated$(NC)"
+test:
+	@echo "$(GREEN)🧪 Running test scan...$(NC)"
+	@echo "Testing with: http://testphp.vulnweb.com"
+	@curl -X POST "http://localhost:5000/scan" \
+		-H "Content-Type: application/json" \
+		-d '{"url": "http://testphp.vulnweb.com", "tools": ["nmap", "nikto"]}' || true
+	@echo -e "\n$(GREEN)✅ Test scan initiated!$(NC)"
+	@echo "Check the dashboard at http://localhost:5000"
 
-shell: ## Open shell in container
-	@echo "$(CYAN)🐚 Opening shell...$(NC)"
-	docker exec -it security_scanner /bin/bash
-
-health: ## Check container health
-	@echo "$(CYAN)🏥 Checking health...$(NC)"
-	@curl -s http://localhost:5000/health | python3 -m json.tool || echo "$(YELLOW)⚠️  Dashboard not responding$(NC)"
-
-stats: ## Show scan statistics
-	@echo "$(CYAN)📈 Fetching statistics...$(NC)"
-	@curl -s http://localhost:5000/api/statistics | python3 -m json.tool || echo "$(YELLOW)⚠️  Cannot fetch stats$(NC)"
-
-backup: ## Backup scan results
-	@echo "$(CYAN)💾 Creating backup...$(NC)"
-	@tar -czf scan_results_backup_$$(date +%Y%m%d_%H%M%S).tar.gz scan_results/
-	@echo "$(GREEN)✓ Backup created$(NC)"
-
-rebuild: ## Rebuild container from scratch
-	@echo "$(CYAN)🔨 Rebuilding container...$(NC)"
-	docker-compose down
-	docker-compose build --no-cache
-	docker-compose up -d
-	@echo "$(GREEN)✓ Rebuild completed$(NC)"
-
-prune: ## Remove all containers and images (clean slate)
-	@echo "$(YELLOW)⚠️  This will remove ALL Docker containers and images!$(NC)"
-	@read -p "Are you sure? (y/N): " confirm; \
-	if [ "$$confirm" = "y" ]; then \
-		echo "$(CYAN)🧹 Pruning Docker...$(NC)"; \
-		docker-compose down -v; \
-		docker system prune -af; \
-		echo "$(GREEN)✓ Pruned$(NC)"; \
-	else \
-		echo "$(YELLOW)Cancelled$(NC)"; \
+scan:
+	@if [ -z "$(URL)" ]; then \
+		echo "$(RED)❌ Please specify URL: make scan URL=http://example.com$(NC)"; \
+		exit 1; \
 	fi
+	@echo "$(GREEN)🎯 Scanning $(URL)...$(NC)"
+	@curl -X POST "http://localhost:5000/scan" \
+		-H "Content-Type: application/json" \
+		-d '{"url": "$(URL)", "tools": ["nmap", "nikto", "whatweb"]}'
+
+clean:
+	@echo "$(YELLOW)🧹 Cleaning up...$(NC)"
+	docker-compose down -v
+	rm -rf scan_results/*.json scan_results/*.log 2>/dev/null || true
+
+setup:
+	@echo "$(GREEN)⚙️  Setting up project...$(NC)"
+	@if [ ! -f "Dockerfile" ]; then \
+		echo "$(RED)Dockerfile not found! Creating...$(NC)"; \
+	fi
+	@echo "$(GREEN)✅ Setup complete. Run 'make start' to begin.$(NC)"

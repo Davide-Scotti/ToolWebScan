@@ -123,22 +123,55 @@ mkdir -p scan_results templates static
 # Download/create project files
 echo -e "\n${CYAN}📥 Setting up project files...${NC}"
 
-# Check if files already exist in current directory
+# Check if we're in the right directory
 if [ -f "orchestrator.py" ] && [ -f "dashboard.py" ]; then
     echo -e "${GREEN}✓ Project files found in current directory${NC}"
-    cp orchestrator.py dashboard.py requirements.txt Dockerfile docker-compose.yml "$PROJECT_DIR/" 2>/dev/null || true
+    
+    # Ensure all required files exist
+    if [ ! -f "scanner.py" ]; then
+        echo -e "${YELLOW}⚠️  Creating scanner.py...${NC}"
+        # Create basic scanner.py if missing
+        cat > scanner.py << 'EOF'
+#!/usr/bin/env python3
+import json
+print('{"status": "ready"}')
+EOF
+    fi
+    
+    if [ ! -f "Dockerfile" ]; then
+        echo -e "${RED}✗ Dockerfile not found${NC}"
+        echo -e "${YELLOW}Please create Dockerfile first${NC}"
+        exit 1
+    fi
+    
+    if [ ! -f "docker-compose.yml" ]; then
+        echo -e "${RED}✗ docker-compose.yml not found${NC}"
+        echo -e "${YELLOW}Please create docker-compose.yml first${NC}"
+        exit 1
+    fi
+    
+    if [ ! -f "Makefile" ]; then
+        echo -e "${YELLOW}⚠️  Creating Makefile...${NC}"
+        # Create Makefile if missing
+        cat > Makefile << 'EOF'
+.PHONY: help start
+help:
+	@echo "Run: make start"
+start:
+	docker-compose up -d
+EOF
+    fi
 else
-    echo -e "${YELLOW}⚠️  Please ensure the following files are in the project directory:${NC}"
+    echo -e "${RED}✗ Required files not found${NC}"
+    echo -e "${YELLOW}Please ensure you have:${NC}"
     echo "  - orchestrator.py"
     echo "  - dashboard.py"
-    echo "  - requirements.txt"
+    echo "  - scanner.py"
     echo "  - Dockerfile"
     echo "  - docker-compose.yml"
     echo ""
-    echo -e "${CYAN}Press Enter when files are ready, or Ctrl+C to cancel${NC}"
-    read
+    exit 1
 fi
-
 # Verify all files exist
 echo -e "\n${CYAN}🔍 Verifying project files...${NC}"
 REQUIRED_FILES=("orchestrator.py" "dashboard.py" "requirements.txt" "Dockerfile" "docker-compose.yml")

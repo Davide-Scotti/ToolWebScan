@@ -67,12 +67,13 @@ class SecurityOrchestrator:
     def check_tool_availability(self) -> Dict[str, bool]:
         """Check which tools are available"""
         tools = {
-            "zap": "zap.sh",
-            "nuclei": "nuclei",
+            "nmap": "nmap",
             "nikto": "nikto",
+            "whatweb": "whatweb",
+            "dirb": "dirb",
+            "gobuster": "gobuster",
             "sqlmap": "sqlmap",
-            "testssl": "testssl.sh",
-            "wapiti": "wapiti"
+            "testssl": "testssl.sh"
         }
         
         available = {}
@@ -90,10 +91,10 @@ class SecurityOrchestrator:
                 if available[name]:
                     print(f"  {Fore.GREEN}✓ {name.upper()}: Available{Style.RESET_ALL}")
                 else:
-                    print(f"  {Fore.RED}✗ {name.upper()}: Not found{Style.RESET_ALL}")
+                    print(f"  {Fore.YELLOW}⚠ {name.upper()}: Not found{Style.RESET_ALL}")
             except:
                 available[name] = False
-                print(f"  {Fore.RED}✗ {name.upper()}: Not found{Style.RESET_ALL}")
+                print(f"  {Fore.YELLOW}⚠ {name.upper()}: Not found{Style.RESET_ALL}")
         
         return available
     
@@ -491,20 +492,20 @@ class SecurityOrchestrator:
         available_tools = self.check_tool_availability()
         
         # Run scans
-        if available_tools.get("nuclei"):
-            self.run_nuclei_scan()
+        if available_tools.get("nmap"):
+            self.run_nmap_scan()
         
         if available_tools.get("nikto"):
             self.run_nikto_scan()
+        
+        if available_tools.get("whatweb"):
+            self.run_whatweb_scan()
         
         if available_tools.get("sqlmap"):
             self.run_sqlmap_scan()
         
         if available_tools.get("testssl"):
             self.run_testssl_scan()
-        
-        if available_tools.get("zap"):
-            self.run_zap_scan()
         
         # Generate summary and save
         self.generate_summary()
