@@ -103,7 +103,8 @@ def start_scan():
                 sys.executable,
                 "orchestrator.py",  # ✅ Cambiato da scanner.py
                 target_url,
-                "-o", str(SCAN_RESULTS_DIR)
+                "-o", str(SCAN_RESULTS_DIR),
+                "--yes"  # ✅ Skip interactive prompt
             ]
             
             print(f"🚀 Starting scan with command: {' '.join(cmd)}")

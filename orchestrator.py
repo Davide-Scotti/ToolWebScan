@@ -91,94 +91,36 @@ class SecurityOrchestrator:
                 if available[name]:
                     print(f"  {Fore.GREEN}✓ {name.upper()}: Available{Style.RESET_ALL}")
                 else:
-                    print(f"  {Fore.YELLOW}⚠ {name.upper()}: Not found{Style.RESET_ALL}")
+                    print(f"  {Fore.YELLOW}⚠  {name.upper()}: Not found{Style.RESET_ALL}")
             except:
                 available[name] = False
-                print(f"  {Fore.YELLOW}⚠ {name.upper()}: Not found{Style.RESET_ALL}")
+                print(f"  {Fore.YELLOW}⚠  {name.upper()}: Not found{Style.RESET_ALL}")
         
         return available
     
-    def run_zap_scan(self):
-        """Run OWASP ZAP scan"""
+    def run_nmap_scan(self):
+        """Run Nmap port scan"""
         print(f"\n{Fore.YELLOW}{'='*60}")
-        print(f"🕷️  Running OWASP ZAP Spider & Active Scan")
+        print(f"🔍 Running Nmap Port Scan")
         print(f"{'='*60}{Style.RESET_ALL}")
         
-        output_file = self.output_dir / f"zap_{self.scan_id}.json"
+        output_file = self.output_dir / f"nmap_{self.scan_id}.xml"
         
         try:
-            # ZAP in daemon mode con spider e active scan
+            # Extract hostname from URL
+            from urllib.parse import urlparse
+            parsed = urlparse(self.target_url)
+            hostname = parsed.netloc or parsed.path
+            
             cmd = [
-                "zap.sh",
-                "-cmd",
-                "-quickurl", self.target_url,
-                "-quickout", str(output_file),
-                "-quickprogress"
+                "nmap",
+                "-sV",  # Service version detection
+                "--script=vuln",  # Vulnerability scripts
+                "-oX", str(output_file),
+                hostname
             ]
             
-            self.logger.info(f"Running ZAP: {' '.join(cmd)}")
-            
-            process = subprocess.Popen(
-                cmd,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True
-            )
-            
-            # Monitor progress
-            for line in process.stdout:
-                if "WARN" in line or "ERROR" in line:
-                    print(f"  {Fore.YELLOW}{line.strip()}{Style.RESET_ALL}")
-                elif "spider" in line.lower():
-                    print(f"  {Fore.CYAN}🕸️  {line.strip()}{Style.RESET_ALL}")
-                elif "complete" in line.lower():
-                    print(f"  {Fore.GREEN}✓ {line.strip()}{Style.RESET_ALL}")
-            
-            process.wait(timeout=600)  # 10 min timeout
-            
-            if output_file.exists():
-                with open(output_file) as f:
-                    zap_results = json.load(f)
-                
-                vulns = self.parse_zap_results(zap_results)
-                self.results["tools"]["zap"] = {
-                    "status": "completed",
-                    "vulnerabilities_found": len(vulns),
-                    "output_file": str(output_file)
-                }
-                self.results["vulnerabilities"].extend(vulns)
-                
-                print(f"  {Fore.GREEN}✓ ZAP scan completed: {len(vulns)} vulnerabilities{Style.RESET_ALL}")
-            else:
-                self.logger.warning("ZAP output file not found")
-                
-        except subprocess.TimeoutExpired:
-            self.logger.error("ZAP scan timeout")
-            process.kill()
-        except Exception as e:
-            self.logger.error(f"ZAP scan failed: {e}")
-            self.results["tools"]["zap"] = {"status": "failed", "error": str(e)}
-    
-    def run_nuclei_scan(self):
-        """Run Nuclei template-based scan"""
-        print(f"\n{Fore.YELLOW}{'='*60}")
-        print(f"⚡ Running Nuclei Template Scan")
-        print(f"{'='*60}{Style.RESET_ALL}")
-        
-        output_file = self.output_dir / f"nuclei_{self.scan_id}.json"
-        
-        try:
-            cmd = [
-                "nuclei",
-                "-u", self.target_url,
-                "-json",
-                "-o", str(output_file),
-                "-severity", "critical,high,medium,low",
-                "-stats",
-                "-silent"
-            ]
-            
-            self.logger.info(f"Running Nuclei: {' '.join(cmd)}")
+            self.logger.info(f"Running Nmap: {' '.join(cmd)}")
             
             process = subprocess.run(
                 cmd,
@@ -187,51 +129,44 @@ class SecurityOrchestrator:
                 timeout=300
             )
             
-            if output_file.exists():
-                vulns = []
-                with open(output_file) as f:
-                    for line in f:
-                        try:
-                            result = json.loads(line)
-                            vulns.append({
-                                "tool": "nuclei",
-                                "name": result.get("info", {}).get("name", "Unknown"),
-                                "severity": result.get("info", {}).get("severity", "unknown"),
-                                "description": result.get("info", {}).get("description", ""),
-                                "matched_at": result.get("matched-at", ""),
-                                "template_id": result.get("template-id", "")
-                            })
-                        except:
-                            continue
-                
-                self.results["tools"]["nuclei"] = {
-                    "status": "completed",
-                    "vulnerabilities_found": len(vulns),
-                    "output_file": str(output_file)
-                }
-                self.results["vulnerabilities"].extend(vulns)
-                
-                print(f"  {Fore.GREEN}✓ Nuclei scan completed: {len(vulns)} vulnerabilities{Style.RESET_ALL}")
+            # Parse results (simplified)
+            vulns = []
+            if "VULNERABLE" in process.stdout.upper():
+                vulns.append({
+                    "tool": "nmap",
+                    "name": "Port Vulnerability Detected",
+                    "severity": "medium",
+                    "description": "Nmap detected potential vulnerabilities",
+                    "output": process.stdout[:500]
+                })
+            
+            self.results["tools"]["nmap"] = {
+                "status": "completed",
+                "vulnerabilities_found": len(vulns),
+                "output_file": str(output_file)
+            }
+            self.results["vulnerabilities"].extend(vulns)
+            
+            print(f"  {Fore.GREEN}✓ Nmap scan completed: {len(vulns)} issues{Style.RESET_ALL}")
             
         except subprocess.TimeoutExpired:
-            self.logger.error("Nuclei scan timeout")
+            self.logger.error("Nmap scan timeout")
         except Exception as e:
-            self.logger.error(f"Nuclei scan failed: {e}")
-            self.results["tools"]["nuclei"] = {"status": "failed", "error": str(e)}
+            self.logger.error(f"Nmap scan failed: {e}")
+            self.results["tools"]["nmap"] = {"status": "failed", "error": str(e)}
     
     def run_nikto_scan(self):
         """Run Nikto web server scan"""
         print(f"\n{Fore.YELLOW}{'='*60}")
-        print(f"🔍 Running Nikto Web Server Scan")
+        print(f"🔎 Running Nikto Web Server Scan")
         print(f"{'='*60}{Style.RESET_ALL}")
         
-        output_file = self.output_dir / f"nikto_{self.scan_id}.json"
+        output_file = self.output_dir / f"nikto_{self.scan_id}.txt"
         
         try:
             cmd = [
                 "nikto",
                 "-h", self.target_url,
-                "-Format", "json",
                 "-output", str(output_file),
                 "-Tuning", "x"  # All tests
             ]
@@ -245,19 +180,25 @@ class SecurityOrchestrator:
                 timeout=600
             )
             
-            if output_file.exists():
-                with open(output_file) as f:
-                    nikto_results = json.load(f)
-                
-                vulns = self.parse_nikto_results(nikto_results)
-                self.results["tools"]["nikto"] = {
-                    "status": "completed",
-                    "vulnerabilities_found": len(vulns),
-                    "output_file": str(output_file)
-                }
-                self.results["vulnerabilities"].extend(vulns)
-                
-                print(f"  {Fore.GREEN}✓ Nikto scan completed: {len(vulns)} issues{Style.RESET_ALL}")
+            # Parse output for vulnerabilities
+            vulns = []
+            for line in process.stdout.split('\n'):
+                if '+' in line and any(keyword in line.lower() for keyword in ['vuln', 'error', 'issue', 'warning']):
+                    vulns.append({
+                        "tool": "nikto",
+                        "name": "Web Server Issue",
+                        "severity": "medium",
+                        "description": line.strip()
+                    })
+            
+            self.results["tools"]["nikto"] = {
+                "status": "completed",
+                "vulnerabilities_found": len(vulns),
+                "output_file": str(output_file)
+            }
+            self.results["vulnerabilities"].extend(vulns)
+            
+            print(f"  {Fore.GREEN}✓ Nikto scan completed: {len(vulns)} issues{Style.RESET_ALL}")
                 
         except subprocess.TimeoutExpired:
             self.logger.error("Nikto scan timeout")
@@ -265,62 +206,38 @@ class SecurityOrchestrator:
             self.logger.error(f"Nikto scan failed: {e}")
             self.results["tools"]["nikto"] = {"status": "failed", "error": str(e)}
     
-    def run_sqlmap_scan(self):
-        """Run SQLMap for SQL injection testing"""
+    def run_whatweb_scan(self):
+        """Run WhatWeb technology detection"""
         print(f"\n{Fore.YELLOW}{'='*60}")
-        print(f"💉 Running SQLMap SQL Injection Scan")
+        print(f"🌐 Running WhatWeb Technology Detection")
         print(f"{'='*60}{Style.RESET_ALL}")
-        
-        output_dir = self.output_dir / "sqlmap"
-        output_dir.mkdir(exist_ok=True)
         
         try:
             cmd = [
-                "sqlmap",
-                "-u", self.target_url,
-                "--batch",  # Non-interactive
-                "--crawl=2",  # Crawl 2 levels
-                "--forms",  # Test forms
-                "--random-agent",
-                "--output-dir", str(output_dir),
-                "--level=1",  # Basic tests
-                "--risk=1"   # Safe
+                "whatweb",
+                self.target_url,
+                "--color=never"
             ]
             
-            self.logger.info(f"Running SQLMap: {' '.join(cmd)}")
+            self.logger.info(f"Running WhatWeb: {' '.join(cmd)}")
             
             process = subprocess.run(
                 cmd,
                 capture_output=True,
                 text=True,
-                timeout=600
+                timeout=60
             )
             
-            # Parse SQLMap output
-            vulns = []
-            if "vulnerable" in process.stdout.lower():
-                vulns.append({
-                    "tool": "sqlmap",
-                    "name": "SQL Injection",
-                    "severity": "critical",
-                    "description": "Potential SQL injection vulnerability detected",
-                    "output": process.stdout
-                })
-            
-            self.results["tools"]["sqlmap"] = {
+            self.results["tools"]["whatweb"] = {
                 "status": "completed",
-                "vulnerabilities_found": len(vulns),
-                "output_dir": str(output_dir)
+                "output": process.stdout
             }
-            self.results["vulnerabilities"].extend(vulns)
             
-            print(f"  {Fore.GREEN}✓ SQLMap scan completed: {len(vulns)} SQL injection points{Style.RESET_ALL}")
+            print(f"  {Fore.GREEN}✓ WhatWeb scan completed{Style.RESET_ALL}")
             
-        except subprocess.TimeoutExpired:
-            self.logger.error("SQLMap scan timeout")
         except Exception as e:
-            self.logger.error(f"SQLMap scan failed: {e}")
-            self.results["tools"]["sqlmap"] = {"status": "failed", "error": str(e)}
+            self.logger.error(f"WhatWeb scan failed: {e}")
+            self.results["tools"]["whatweb"] = {"status": "failed", "error": str(e)}
     
     def run_testssl_scan(self):
         """Run testssl.sh for SSL/TLS testing"""
@@ -328,7 +245,7 @@ class SecurityOrchestrator:
         print(f"🔒 Running SSL/TLS Security Scan")
         print(f"{'='*60}{Style.RESET_ALL}")
         
-        output_file = self.output_dir / f"testssl_{self.scan_id}.json"
+        output_file = self.output_dir / f"testssl_{self.scan_id}.txt"
         
         try:
             # Extract hostname from URL
@@ -338,7 +255,6 @@ class SecurityOrchestrator:
             
             cmd = [
                 "testssl.sh",
-                "--json", str(output_file),
                 "--warnings", "off",
                 hostname
             ]
@@ -352,74 +268,34 @@ class SecurityOrchestrator:
                 timeout=300
             )
             
-            if output_file.exists():
-                with open(output_file) as f:
-                    ssl_results = json.load(f)
-                
-                vulns = self.parse_testssl_results(ssl_results)
-                self.results["tools"]["testssl"] = {
-                    "status": "completed",
-                    "vulnerabilities_found": len(vulns),
-                    "output_file": str(output_file)
-                }
-                self.results["vulnerabilities"].extend(vulns)
-                
-                print(f"  {Fore.GREEN}✓ SSL/TLS scan completed: {len(vulns)} issues{Style.RESET_ALL}")
+            # Parse results for vulnerabilities
+            vulns = []
+            for line in process.stdout.split('\n'):
+                if any(keyword in line.upper() for keyword in ['VULNERABLE', 'WEAK', 'INSECURE']):
+                    vulns.append({
+                        "tool": "testssl",
+                        "name": "SSL/TLS Issue",
+                        "severity": "high",
+                        "description": line.strip()
+                    })
+            
+            with open(output_file, 'w') as f:
+                f.write(process.stdout)
+            
+            self.results["tools"]["testssl"] = {
+                "status": "completed",
+                "vulnerabilities_found": len(vulns),
+                "output_file": str(output_file)
+            }
+            self.results["vulnerabilities"].extend(vulns)
+            
+            print(f"  {Fore.GREEN}✓ SSL/TLS scan completed: {len(vulns)} issues{Style.RESET_ALL}")
                 
         except subprocess.TimeoutExpired:
             self.logger.error("testssl.sh timeout")
         except Exception as e:
             self.logger.error(f"testssl.sh failed: {e}")
             self.results["tools"]["testssl"] = {"status": "failed", "error": str(e)}
-    
-    def parse_zap_results(self, data: dict) -> List[dict]:
-        """Parse ZAP results"""
-        vulns = []
-        for site in data.get("site", []):
-            for alert in site.get("alerts", []):
-                vulns.append({
-                    "tool": "zap",
-                    "name": alert.get("name", "Unknown"),
-                    "severity": alert.get("riskdesc", "Unknown").split()[0].lower(),
-                    "description": alert.get("desc", ""),
-                    "solution": alert.get("solution", ""),
-                    "instances": len(alert.get("instances", []))
-                })
-        return vulns
-    
-    def parse_nikto_results(self, data: dict) -> List[dict]:
-        """Parse Nikto results"""
-        vulns = []
-        for host_data in data.get("vulnerabilities", []):
-            for vuln in host_data:
-                vulns.append({
-                    "tool": "nikto",
-                    "name": vuln.get("msg", "Unknown"),
-                    "severity": "medium",
-                    "description": vuln.get("msg", ""),
-                    "method": vuln.get("method", "")
-                })
-        return vulns
-    
-    def parse_testssl_results(self, data: list) -> List[dict]:
-        """Parse testssl.sh results"""
-        vulns = []
-        for finding in data:
-            severity_map = {
-                "CRITICAL": "critical",
-                "HIGH": "high",
-                "MEDIUM": "medium",
-                "LOW": "low"
-            }
-            
-            if finding.get("severity") in ["CRITICAL", "HIGH", "MEDIUM"]:
-                vulns.append({
-                    "tool": "testssl",
-                    "name": finding.get("id", "Unknown"),
-                    "severity": severity_map.get(finding.get("severity"), "unknown"),
-                    "description": finding.get("finding", ""),
-                })
-        return vulns
     
     def generate_summary(self):
         """Generate scan summary"""
@@ -485,7 +361,7 @@ class SecurityOrchestrator:
         self.print_banner()
         
         print(f"\n{Fore.CYAN}🎯 Target: {self.target_url}{Style.RESET_ALL}")
-        print(f"📁 Output directory: {self.output_dir}")
+        print(f"📂 Output directory: {self.output_dir}")
         print(f"🆔 Scan ID: {self.scan_id}\n")
         
         # Check tools
@@ -500,9 +376,6 @@ class SecurityOrchestrator:
         
         if available_tools.get("whatweb"):
             self.run_whatweb_scan()
-        
-        if available_tools.get("sqlmap"):
-            self.run_sqlmap_scan()
         
         if available_tools.get("testssl"):
             self.run_testssl_scan()
@@ -521,22 +394,31 @@ def main():
     
     parser.add_argument('url', help='Target URL to scan')
     parser.add_argument('-o', '--output', default='scan_results', help='Output directory')
+    parser.add_argument('-y', '--yes', '--non-interactive', 
+                       action='store_true',
+                       dest='non_interactive',
+                       help='Non-interactive mode (skip authorization prompt)')
     
     args = parser.parse_args()
     
-    # Ethical check
-    print(f"\n{Fore.RED}⚠️  SECURITY NOTICE ⚠️{Style.RESET_ALL}")
-    print(f"{Fore.YELLOW}You are about to scan: {args.url}{Style.RESET_ALL}")
-    print(f"\n{Fore.WHITE}This scanner is ONLY for:{Style.RESET_ALL}")
-    print("  1. Systems you own")
-    print("  2. Authorized test environments")
-    print("  3. Educational purposes with permission")
-    print(f"\n{Fore.RED}⛔ Testing unauthorized systems is ILLEGAL!{Style.RESET_ALL}")
-    
-    consent = input(f"\n{Fore.GREEN}Do you have written authorization? (yes/NO): {Style.RESET_ALL}")
-    if consent.lower() != 'yes':
-        print(f"{Fore.YELLOW}Scan cancelled.{Style.RESET_ALL}")
-        sys.exit(0)
+    # 🔧 FIX: Skip interactive prompt if --yes flag is provided
+    if not args.non_interactive:
+        # Ethical check (only in interactive mode)
+        print(f"\n{Fore.RED}⚠️  SECURITY NOTICE ⚠️{Style.RESET_ALL}")
+        print(f"{Fore.YELLOW}You are about to scan: {args.url}{Style.RESET_ALL}")
+        print(f"\n{Fore.WHITE}This scanner is ONLY for:{Style.RESET_ALL}")
+        print("  1. Systems you own")
+        print("  2. Authorized test environments")
+        print("  3. Educational purposes with permission")
+        print(f"\n{Fore.RED}⛔ Testing unauthorized systems is ILLEGAL!{Style.RESET_ALL}")
+        
+        consent = input(f"\n{Fore.GREEN}Do you have written authorization? (yes/NO): {Style.RESET_ALL}")
+        if consent.lower() != 'yes':
+            print(f"{Fore.YELLOW}Scan cancelled.{Style.RESET_ALL}")
+            sys.exit(0)
+    else:
+        print(f"{Fore.YELLOW}⚠️  Running in non-interactive mode{Style.RESET_ALL}")
+        print(f"{Fore.YELLOW}⚠️  Ensure you have proper authorization!{Style.RESET_ALL}\n")
     
     # Run orchestrator
     orchestrator = SecurityOrchestrator(args.url, args.output)
