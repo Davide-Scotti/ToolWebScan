@@ -1,0 +1,28 @@
+version: '3.8'
+
+services:
+  security-scanner:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: security_scanner
+    ports:
+      - "5000:5000"  # Dashboard web
+    volumes:
+      - ./scan_results:/scanner/scan_results  # Persist scan results
+      - ./orchestrator.py:/scanner/orchestrator.py
+      - ./dashboard.py:/scanner/dashboard.py
+    environment:
+      - PYTHONUNBUFFERED=1
+      - TZ=Europe/Rome
+    networks:
+      - scanner_network
+    restart: unless-stopped
+    command: python3 dashboard.py
+
+networks:
+  scanner_network:
+    driver: bridge
+
+volumes:
+  scan_results:
