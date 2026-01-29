@@ -1,18 +1,15 @@
 #!/usr/bin/env python3
 """
 Advanced Security Scanner Orchestrator
-Coordina multipli security tools professionali
 """
 
 import subprocess
 import json
-import os
 import sys
-import time
 from datetime import datetime
 from pathlib import Path
 import logging
-from typing import Dict, List
+from typing import Dict
 import argparse
 from colorama import Fore, Style, init
 
@@ -50,16 +47,11 @@ class SecurityOrchestrator:
         self.logger = logging.getLogger(__name__)
     
     def print_banner(self):
-        """Print orchestrator banner"""
+        """Print banner"""
         banner = f"""
 {Fore.CYAN}╔═══════════════════════════════════════════════════════════╗
-║                                                           ║
 ║   {Fore.YELLOW}🔐 ADVANCED SECURITY SCANNER ORCHESTRATOR 🔐{Fore.CYAN}        ║
-║                                                           ║
-║   {Fore.WHITE}Integrating Professional Security Tools:{Fore.CYAN}              ║
-║   {Fore.GREEN}✓ OWASP ZAP    ✓ Nuclei       ✓ Nikto{Fore.CYAN}              ║
-║   {Fore.GREEN}✓ SQLMap       ✓ Testssl.sh   ✓ Wapiti{Fore.CYAN}             ║
-║                                                           ║
+║   {Fore.WHITE}Web App + Infrastructure Testing{Fore.CYAN}                      ║
 ╚═══════════════════════════════════════════════════════════╝{Style.RESET_ALL}
         """
         print(banner)
@@ -70,9 +62,6 @@ class SecurityOrchestrator:
             "nmap": "nmap",
             "nikto": "nikto",
             "whatweb": "whatweb",
-            "dirb": "dirb",
-            "gobuster": "gobuster",
-            "sqlmap": "sqlmap",
             "testssl": "testssl.sh"
         }
         
@@ -98,6 +87,40 @@ class SecurityOrchestrator:
         
         return available
     
+    def run_webapp_scan(self):
+        """Run Web Application Scanner - PRIORITÀ MASSIMA"""
+        print(f"\n{Fore.YELLOW}{'='*60}")
+        print(f"🎯 Running Web Application Security Tests")
+        print(f"{'='*60}{Style.RESET_ALL}")
+        
+        try:
+            from webapp_scanner import WebAppScanner
+            
+            scanner = WebAppScanner(self.target_url)
+            vulns = scanner.scan()
+            
+            self.results["tools"]["webapp_scanner"] = {
+                "status": "completed",
+                "vulnerabilities_found": len(vulns),
+                "tests": "XSS, SQLi, Path Traversal, Command Injection, SSRF, XXE"
+            }
+            self.results["vulnerabilities"].extend(vulns)
+            
+            print(f"  {Fore.GREEN}✓ Web scan completed: {len(vulns)} vulnerabilities{Style.RESET_ALL}")
+            
+        except ImportError:
+            self.logger.error("webapp_scanner.py not found - install beautifulsoup4")
+            self.results["tools"]["webapp_scanner"] = {
+                "status": "failed",
+                "error": "Module not found"
+            }
+        except Exception as e:
+            self.logger.error(f"Web scan failed: {e}")
+            self.results["tools"]["webapp_scanner"] = {
+                "status": "failed",
+                "error": str(e)
+            }
+    
     def run_nmap_scan(self):
         """Run Nmap port scan"""
         print(f"\n{Fore.YELLOW}{'='*60}")
@@ -107,15 +130,14 @@ class SecurityOrchestrator:
         output_file = self.output_dir / f"nmap_{self.scan_id}.xml"
         
         try:
-            # Extract hostname from URL
             from urllib.parse import urlparse
             parsed = urlparse(self.target_url)
             hostname = parsed.netloc or parsed.path
             
             cmd = [
                 "nmap",
-                "-sV",  # Service version detection
-                "--script=vuln",  # Vulnerability scripts
+                "-sV",
+                "--script=vuln",
                 "-oX", str(output_file),
                 hostname
             ]
@@ -129,7 +151,6 @@ class SecurityOrchestrator:
                 timeout=300
             )
             
-            # Parse results (simplified)
             vulns = []
             if "VULNERABLE" in process.stdout.upper():
                 vulns.append({
@@ -147,16 +168,16 @@ class SecurityOrchestrator:
             }
             self.results["vulnerabilities"].extend(vulns)
             
-            print(f"  {Fore.GREEN}✓ Nmap scan completed: {len(vulns)} issues{Style.RESET_ALL}")
+            print(f"  {Fore.GREEN}✓ Nmap completed: {len(vulns)} issues{Style.RESET_ALL}")
             
         except subprocess.TimeoutExpired:
-            self.logger.error("Nmap scan timeout")
+            self.logger.error("Nmap timeout")
         except Exception as e:
-            self.logger.error(f"Nmap scan failed: {e}")
+            self.logger.error(f"Nmap failed: {e}")
             self.results["tools"]["nmap"] = {"status": "failed", "error": str(e)}
     
     def run_nikto_scan(self):
-        """Run Nikto web server scan"""
+        """Run Nikto"""
         print(f"\n{Fore.YELLOW}{'='*60}")
         print(f"🔎 Running Nikto Web Server Scan")
         print(f"{'='*60}{Style.RESET_ALL}")
@@ -168,7 +189,7 @@ class SecurityOrchestrator:
                 "nikto",
                 "-h", self.target_url,
                 "-output", str(output_file),
-                "-Tuning", "x"  # All tests
+                "-Tuning", "x"
             ]
             
             self.logger.info(f"Running Nikto: {' '.join(cmd)}")
@@ -180,10 +201,9 @@ class SecurityOrchestrator:
                 timeout=600
             )
             
-            # Parse output for vulnerabilities
             vulns = []
             for line in process.stdout.split('\n'):
-                if '+' in line and any(keyword in line.lower() for keyword in ['vuln', 'error', 'issue', 'warning']):
+                if '+' in line and any(kw in line.lower() for kw in ['vuln', 'error', 'issue', 'warning']):
                     vulns.append({
                         "tool": "nikto",
                         "name": "Web Server Issue",
@@ -198,16 +218,16 @@ class SecurityOrchestrator:
             }
             self.results["vulnerabilities"].extend(vulns)
             
-            print(f"  {Fore.GREEN}✓ Nikto scan completed: {len(vulns)} issues{Style.RESET_ALL}")
+            print(f"  {Fore.GREEN}✓ Nikto completed: {len(vulns)} issues{Style.RESET_ALL}")
                 
         except subprocess.TimeoutExpired:
-            self.logger.error("Nikto scan timeout")
+            self.logger.error("Nikto timeout")
         except Exception as e:
-            self.logger.error(f"Nikto scan failed: {e}")
+            self.logger.error(f"Nikto failed: {e}")
             self.results["tools"]["nikto"] = {"status": "failed", "error": str(e)}
     
     def run_whatweb_scan(self):
-        """Run WhatWeb technology detection"""
+        """Run WhatWeb"""
         print(f"\n{Fore.YELLOW}{'='*60}")
         print(f"🌐 Running WhatWeb Technology Detection")
         print(f"{'='*60}{Style.RESET_ALL}")
@@ -233,14 +253,14 @@ class SecurityOrchestrator:
                 "output": process.stdout
             }
             
-            print(f"  {Fore.GREEN}✓ WhatWeb scan completed{Style.RESET_ALL}")
+            print(f"  {Fore.GREEN}✓ WhatWeb completed{Style.RESET_ALL}")
             
         except Exception as e:
-            self.logger.error(f"WhatWeb scan failed: {e}")
+            self.logger.error(f"WhatWeb failed: {e}")
             self.results["tools"]["whatweb"] = {"status": "failed", "error": str(e)}
     
     def run_testssl_scan(self):
-        """Run testssl.sh for SSL/TLS testing"""
+        """Run testssl.sh"""
         print(f"\n{Fore.YELLOW}{'='*60}")
         print(f"🔒 Running SSL/TLS Security Scan")
         print(f"{'='*60}{Style.RESET_ALL}")
@@ -248,7 +268,6 @@ class SecurityOrchestrator:
         output_file = self.output_dir / f"testssl_{self.scan_id}.txt"
         
         try:
-            # Extract hostname from URL
             from urllib.parse import urlparse
             parsed = urlparse(self.target_url)
             hostname = parsed.netloc or parsed.path
@@ -268,10 +287,9 @@ class SecurityOrchestrator:
                 timeout=300
             )
             
-            # Parse results for vulnerabilities
             vulns = []
             for line in process.stdout.split('\n'):
-                if any(keyword in line.upper() for keyword in ['VULNERABLE', 'WEAK', 'INSECURE']):
+                if any(kw in line.upper() for kw in ['VULNERABLE', 'WEAK', 'INSECURE']):
                     vulns.append({
                         "tool": "testssl",
                         "name": "SSL/TLS Issue",
@@ -289,32 +307,29 @@ class SecurityOrchestrator:
             }
             self.results["vulnerabilities"].extend(vulns)
             
-            print(f"  {Fore.GREEN}✓ SSL/TLS scan completed: {len(vulns)} issues{Style.RESET_ALL}")
+            print(f"  {Fore.GREEN}✓ SSL/TLS completed: {len(vulns)} issues{Style.RESET_ALL}")
                 
         except subprocess.TimeoutExpired:
-            self.logger.error("testssl.sh timeout")
+            self.logger.error("testssl timeout")
         except Exception as e:
-            self.logger.error(f"testssl.sh failed: {e}")
+            self.logger.error(f"testssl failed: {e}")
             self.results["tools"]["testssl"] = {"status": "failed", "error": str(e)}
     
     def generate_summary(self):
-        """Generate scan summary"""
+        """Generate summary"""
         total_vulns = len(self.results["vulnerabilities"])
         
         severity_count = {
             "critical": 0,
             "high": 0,
             "medium": 0,
-            "low": 0,
-            "unknown": 0
+            "low": 0
         }
         
         for vuln in self.results["vulnerabilities"]:
-            severity = vuln.get("severity", "unknown").lower()
+            severity = vuln.get("severity", "medium").lower()
             if severity in severity_count:
                 severity_count[severity] += 1
-            else:
-                severity_count["unknown"] += 1
         
         self.results["summary"] = {
             "total_vulnerabilities": total_vulns,
@@ -326,7 +341,7 @@ class SecurityOrchestrator:
         self.results["end_time"] = datetime.now().isoformat()
     
     def print_summary(self):
-        """Print scan summary"""
+        """Print summary"""
         summary = self.results["summary"]
         
         print(f"\n{Fore.CYAN}{'='*60}")
@@ -335,21 +350,21 @@ class SecurityOrchestrator:
         
         print(f"\n{Fore.WHITE}Target: {self.target_url}{Style.RESET_ALL}")
         print(f"Scan ID: {self.scan_id}")
-        print(f"Duration: {summary['scan_duration']:.2f} seconds")
-        print(f"Tools executed: {summary['tools_run']}")
+        print(f"Duration: {summary['scan_duration']:.2f}s")
+        print(f"Tools: {summary['tools_run']}")
         
-        print(f"\n{Fore.WHITE}Vulnerabilities Found:{Style.RESET_ALL}")
+        print(f"\n{Fore.WHITE}Vulnerabilities:{Style.RESET_ALL}")
         print(f"  {Fore.RED}🔴 Critical: {summary['by_severity']['critical']}{Style.RESET_ALL}")
         print(f"  {Fore.RED}🟠 High: {summary['by_severity']['high']}{Style.RESET_ALL}")
         print(f"  {Fore.YELLOW}🟡 Medium: {summary['by_severity']['medium']}{Style.RESET_ALL}")
         print(f"  {Fore.GREEN}🟢 Low: {summary['by_severity']['low']}{Style.RESET_ALL}")
         print(f"  {Fore.CYAN}Total: {summary['total_vulnerabilities']}{Style.RESET_ALL}")
         
-        print(f"\n{Fore.WHITE}Reports saved to: {self.output_dir}{Style.RESET_ALL}")
+        print(f"\n{Fore.WHITE}Report: {self.output_dir}/summary_{self.scan_id}.json{Style.RESET_ALL}")
         print(f"{Fore.CYAN}{'='*60}{Style.RESET_ALL}")
     
     def save_results(self):
-        """Save results to JSON"""
+        """Save results"""
         output_file = self.output_dir / f"summary_{self.scan_id}.json"
         with open(output_file, 'w') as f:
             json.dump(self.results, f, indent=2)
@@ -357,17 +372,18 @@ class SecurityOrchestrator:
         self.logger.info(f"Results saved to {output_file}")
     
     def run_full_scan(self):
-        """Run all available scans"""
+        """Run ALL scans"""
         self.print_banner()
         
         print(f"\n{Fore.CYAN}🎯 Target: {self.target_url}{Style.RESET_ALL}")
-        print(f"📂 Output directory: {self.output_dir}")
         print(f"🆔 Scan ID: {self.scan_id}\n")
         
-        # Check tools
+        # 1. WEB APP SCANNER (PRIORITÀ MASSIMA)
+        self.run_webapp_scan()
+        
+        # 2. INFRASTRUCTURE TOOLS
         available_tools = self.check_tool_availability()
         
-        # Run scans
         if available_tools.get("nmap"):
             self.run_nmap_scan()
         
@@ -380,47 +396,35 @@ class SecurityOrchestrator:
         if available_tools.get("testssl"):
             self.run_testssl_scan()
         
-        # Generate summary and save
+        # 3. SUMMARY
         self.generate_summary()
         self.save_results()
         self.print_summary()
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Advanced Security Scanner Orchestrator",
-        epilog="Example: python orchestrator.py http://localhost:8080"
-    )
-    
-    parser.add_argument('url', help='Target URL to scan')
-    parser.add_argument('-o', '--output', default='scan_results', help='Output directory')
+    parser = argparse.ArgumentParser(description="Advanced Security Scanner")
+    parser.add_argument('url', help='Target URL')
+    parser.add_argument('-o', '--output', default='scan_results', help='Output dir')
     parser.add_argument('-y', '--yes', '--non-interactive', 
                        action='store_true',
                        dest='non_interactive',
-                       help='Non-interactive mode (skip authorization prompt)')
+                       help='Skip authorization prompt')
     
     args = parser.parse_args()
     
-    # 🔧 FIX: Skip interactive prompt if --yes flag is provided
     if not args.non_interactive:
-        # Ethical check (only in interactive mode)
-        print(f"\n{Fore.RED}⚠️  SECURITY NOTICE ⚠️{Style.RESET_ALL}")
-        print(f"{Fore.YELLOW}You are about to scan: {args.url}{Style.RESET_ALL}")
-        print(f"\n{Fore.WHITE}This scanner is ONLY for:{Style.RESET_ALL}")
-        print("  1. Systems you own")
-        print("  2. Authorized test environments")
-        print("  3. Educational purposes with permission")
-        print(f"\n{Fore.RED}⛔ Testing unauthorized systems is ILLEGAL!{Style.RESET_ALL}")
+        print(f"\n{Fore.RED}⚠️  SECURITY NOTICE{Style.RESET_ALL}")
+        print(f"Target: {args.url}")
+        print("Only scan systems you own or have authorization!")
         
-        consent = input(f"\n{Fore.GREEN}Do you have written authorization? (yes/NO): {Style.RESET_ALL}")
+        consent = input(f"\n{Fore.GREEN}Continue? (yes/NO): {Style.RESET_ALL}")
         if consent.lower() != 'yes':
-            print(f"{Fore.YELLOW}Scan cancelled.{Style.RESET_ALL}")
+            print("Cancelled.")
             sys.exit(0)
     else:
-        print(f"{Fore.YELLOW}⚠️  Running in non-interactive mode{Style.RESET_ALL}")
-        print(f"{Fore.YELLOW}⚠️  Ensure you have proper authorization!{Style.RESET_ALL}\n")
+        print(f"{Fore.YELLOW}⚠️  Non-interactive mode{Style.RESET_ALL}\n")
     
-    # Run orchestrator
     orchestrator = SecurityOrchestrator(args.url, args.output)
     orchestrator.run_full_scan()
 
