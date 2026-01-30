@@ -1,8 +1,21 @@
+# Web Framework
 Flask==2.3.3
 Flask-CORS==4.0.0
+Werkzeug==2.3.7
+
+# HTTP & Crawling
 requests==2.31.0
 beautifulsoup4==4.12.2
+lxml==5.0.0
+
+# Utilities
 colorama==0.4.6
 python-dateutil==2.8.2
-lxml==5.0.0
-Werkzeug==2.3.7
+
+# JWT Analysis
+PyJWT==2.8.0
+
+# NUOVO: Advanced features
+selenium==4.15.0           # Per DOM-based XSS analysis
+urllib3==2.1.0
+chardet==5.2.0
